@@ -255,7 +255,7 @@ class NJE:
         self.send_SOHENQ()
         buff = self.processData(self.getData())
 
-        if buff[0]['Data'] != '\x10\x70':
+        if buff[0]['Data'] != b'\x10\x70':
             print ("[!] Sent SOH ENQ but did not recieve DLE ACK0")
             self.disconnect()
             return False
@@ -306,32 +306,32 @@ class NJE:
         """Creates Node Message Records which can contain either Commands
             or messages"""
 
-        RCB = "\x9A"
-        SRCB = "\x00"
+        RCB = b"\x9A"
+        SRCB = b"\x00"
 
         if cmd:
             self.msg("Creating NMR Command")
-            NMRFLAG  = "\x90" #NMRFLAGC Set to 'on'. From IBM "If on, the NMR contains a command"
+            NMRFLAG  = b"\x90" #NMRFLAGC Set to 'on'. From IBM "If on, the NMR contains a command"
             NMRTO    = self.OHOST + self.target_node # This is TO node name and number
             NMROUT   = chr(0)*8 # was 00:00:00:00:01:00:00:01 but no idea if it needs to be
             NMRFM    = self.RHOST + self.own_node
-            NMRLEVEL = "\x77" # The level, we put it as essential
-            NMRTYPE  = "\x00" # 00 for unformatted commands.
+            NMRLEVEL = b"\x77" # The level, we put it as essential
+            NMRTYPE  = b"\x00" # 00 for unformatted commands.
         else:
             if not user:
                 self.msg("Creating NMR Message")
-                NMRFLAG = "\x10" # Console Message
-                NMROUT  = "\x00\x00\x00\x00\x00\x00\x00\x00"
+                NMRFLAG = b"\x10" # Console Message
+                NMROUT  = b"\x00\x00\x00\x00\x00\x00\x00\x00"
             else:
                 self.msg("Creating NMR Message for User: %s", user)
-                NMRFLAG = "\x20"
+                NMRFLAG = b"\x20"
                 NMROUT  = self.padding(user.upper())
-            NMRLEVEL = "\x30" #Normal messages
-            NMRTYPE = "\x00"
+            NMRLEVEL = b"\x30" #Normal messages
+            NMRTYPE = b"\x00"
             NMRTO   = self.OHOST + self.target_node # Includes NMRTOQUL
             NMRFM    = self.RHOST + self.own_node
-            NMRLEVEL = "\x00" # The level, we put it as essential
-            NMRTYPE  = "\x00" # 00 for unformatted commands.
+            NMRLEVEL = b"\x00" # The level, we put it as essential
+            NMRTYPE  = b"\x00" # 00 for unformatted commands.
 
 
 
@@ -374,7 +374,7 @@ class NJE:
         else:
             nje_record += data
 
-        DS  = "\x10" + "\x02" #DLE-STX
+        DS  = b"\x10" + b"\x02" #DLE-STX
         BCB  = chr(self.sequence)
         FCS  = self.FCS
         TTR = self.calcTTR(DS + BCB + FCS + nje_record)
@@ -421,10 +421,10 @@ class NJE:
                 nje_record += data
 
         #adding an EOR record:
-        nje_record += "\x00"
+        nje_record += b"\x00"
 
-        DS  = "\x10" + "\x02" #DLE-STX
-        BCB  = chr(self.sequence)
+        DS  = b"\x10" + b"\x02" #DLE-STX
+        BCB  = bytes([chr(self.sequence)])
         FCS  = self.FCS
         TTR = self.calcTTR(DS + BCB + FCS + nje_record)
         records = TTR + DS + BCB + FCS + nje_record
@@ -435,8 +435,8 @@ class NJE:
     def sendHeartbeat(self):
         self.msg("Sending Hearbeat Request Reply")
         BCB  = chr(self.sequence)
-        self.sendData("\x00\x00\x00\x16\x00\x00\x00\x00\x00\x00\x00\x06\x10\x02" +
-                      BCB + self.FCS + "00\x00\x00\x00\x00")
+        self.sendData(b"\x00\x00\x00\x16\x00\x00\x00\x00\x00\x00\x00\x06\x10\x02" +
+                      BCB + self.FCS + b"00\x00\x00\x00\x00")
         self.INC_SEQUENCE()
 
     def check_signoff(self, buf):
@@ -452,7 +452,7 @@ class NJE:
         self.msg("Sending  >> SOH ENQ")
         # SOH (0x01) and ENQ (0x2D) are control chars and are the second thing we have to send
         # for a successful connection
-        SOHENQ = "\x01\x2D"
+        SOHENQ = b"\x01\x2D"
         with_TTR = self.makeTTR( SOHENQ )
         with_TTB = self.makeTTB(with_TTR)
         self.sendData(with_TTB)
@@ -460,16 +460,16 @@ class NJE:
     def send_I_record(self):
         ''' Creates Initial Signon Record 'I' '''
         # From Page 111 in has2a620.pdf
-        self.FCS = "\x8F\xCF"
-        NCCRCB = "\xF0" # Control Record
-        NCCSRCB = "\xC9" # EBCDIC letter 'I'
-        LEN = "\x29" # LENGTH OF RECORD
-        NCCIEVNT = "\x00" * 4
-        NCCIREST = "\x00\x64" # Node Resistance
-        BUFSIZE = "\x80\x00" # Buffer Size. Set to: 32768
+        self.FCS = b"\x8F\xCF"
+        NCCRCB = b"\xF0" # Control Record
+        NCCSRCB = b"\xC9" # EBCDIC letter 'I'
+        LEN = b"\x29" # LENGTH OF RECORD
+        NCCIEVNT = b"\x00" * 4
+        NCCIREST = b"\x00\x64" # Node Resistance
+        BUFSIZE = b"\x80\x00" # Buffer Size. Set to: 32768
         PASSWORD = self.padding(self.password)*2
-        NCCIFLG = "\x00" # 0 for initial signon
-        NCCIFEAT = "\x15\x00\x00\x00"
+        NCCIFLG = b"\x00" # 0 for initial signon
+        NCCIFEAT = b"\x15\x00\x00\x00"
         p = LEN + self.RHOST + self.own_node + NCCIEVNT + NCCIREST + BUFSIZE + PASSWORD    + NCCIFLG + NCCIFEAT
         self.msg("Sending  >> Initial Signon Record type: I")
         self.sendNJE(NCCRCB, NCCSRCB, p)
@@ -483,19 +483,19 @@ class NJE:
 
     def makeTTB(self, data):
         # TTB includes it's own length of 8 plus the EOB of 4 bytes.
-        return ("\x00\x00" + struct.pack('>H', len(data)+8+4) +
-                "\x00\x00\x00\x00" + data + "\x00\x00\x00\x00")
+        return (b"\x00\x00" + struct.pack('>H', len(data)+8+4) +
+                b"\x00\x00\x00\x00" + data + b"\x00\x00\x00\x00")
 
     def makeTTR(self, data, eor=False):
         # a datablock TTR doesn't include it's own length of 4 nor an EOB
         # dbh = data block header
         if eor:
-            return "\x00\x00" + struct.pack('>H', len(data)) + data + "\x00"
+            return b"\x00\x00" + struct.pack('>H', len(data)) + data + b"\x00"
         else:
-            return "\x00\x00" + struct.pack('>H', len(data)) + data
+            return b"\x00\x00" + struct.pack('>H', len(data)) + data
 
     def calcTTR(self, data):
-        return "\x00\x00" + struct.pack('>H', len(data))
+        return b"\x00\x00" + struct.pack('>H', len(data))
 
     #def makeTTR_block_header(self, data):
         # a regular TTR doesn't include it's own length of 4 but does add an EOB for TTR which is one byte long
@@ -562,9 +562,9 @@ class NJE:
                 if record_length == 6:
                     #hearbeat
                     packet_dict = {
-                    'RCB'  : "\x00",
-                    'SRCB' : "\x00",
-                    'Data' : "\x00"
+                    'RCB'  : b"\x00",
+                    'SRCB' : b"\x00",
+                    'Data' : b"\x00"
                     }
                     received_data.append(packet_dict)
                 elif record_length > 2:
@@ -651,7 +651,7 @@ class NJE:
 
             RCB = ord(record['RCB'])
 
-            if record['RCB'] == "\x00" and record['SRCB'] == '\x00' and record['Data'] == "\x00":
+            if record['RCB'] == b"\x00" and record['SRCB'] == b'\x00' and record['Data'] == b"\x00":
                 self.sendHeartbeat()
 
 
@@ -663,9 +663,9 @@ class NJE:
                 record['stream'] = record['SRCB']
                 self.msg("Stream: %r", record['stream'])
                 #I'll allow it
-                RCB = "\xA0"
+                RCB = b"\xA0"
                 SRCB = record['stream']
-                self.sendNJE(RCB, SRCB, "\x00\x00")
+                self.sendNJE(RCB, SRCB, b"\x00\x00")
                 return
             elif RCB == 0xA0:
                 self.msg("Type: Permission to initiate stream (A0)")
@@ -1446,7 +1446,7 @@ class NJE:
         self.msg("Total bytes: %i compressed to %i", processed_bytes, len(d))
         #self.msg("Remaining bytes: %i", len(buf))
         self.msg("Compressed: %s", self.phex(d))
-        return (d+'\x00', len(buf))
+        return (d+b'\x00', len(buf))
 
     def compressed(self, RCB_string):
         RCB = ord(RCB_string)
@@ -1494,7 +1494,7 @@ class NJE:
                     repeat = True
                 else:
                     #self.msg("%i spaces added", count)
-                    buf += "\x40" * count
+                    buf += b"\x40" * count
 
         self.msg("Decompressed %i bytes to %i bytes", b, len(buf))
         return (buf, b)
