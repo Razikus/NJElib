@@ -375,7 +375,7 @@ class NJE:
             nje_record += data
 
         DS  = b"\x10" + b"\x02" #DLE-STX
-        BCB  = chr(self.sequence)
+        BCB  = bytes([chr(self.sequence)])
         FCS  = self.FCS
         TTR = self.calcTTR(DS + BCB + FCS + nje_record)
         records = TTR + DS + BCB + FCS + nje_record
@@ -401,7 +401,7 @@ class NJE:
                   record is created with RCB + SRCB
         """
 
-        nje_record = ''
+        nje_record = b''
 
         for record in records:
             self.msg("Creating NJE Record with RCB of %r and SRCB of %r", record['RCB'], record['SRCB'])
@@ -434,7 +434,7 @@ class NJE:
 
     def sendHeartbeat(self):
         self.msg("Sending Hearbeat Request Reply")
-        BCB  = chr(self.sequence)
+        BCB  = bytes([chr(self.sequence)])
         self.sendData(b"\x00\x00\x00\x16\x00\x00\x00\x00\x00\x00\x00\x06\x10\x02" +
                       BCB + self.FCS + b"00\x00\x00\x00\x00")
         self.INC_SEQUENCE()
