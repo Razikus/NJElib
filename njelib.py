@@ -735,10 +735,10 @@ class NJE:
             B - Signoff
             """
 
-        SRCB = self.EbcdicToAscii(bytes(record['SRCB']))
-        if SRCB == "I":
+        SRCB = record['SRCB']
+        if SRCB == 201:
             self.msg("[NCCR] I - Initial Signon")
-        elif SRCB == "J":
+        elif SRCB == 209:
             self.msg("[NCCR] J - Response signon")
             record['NCCIDL'] =  bytes(record['Data'][0])
             record['NCCINODE'] = self.EbcdicToAscii(record['Data'][1:9])
