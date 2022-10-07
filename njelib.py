@@ -1449,7 +1449,10 @@ class NJE:
         return (d+b'\x00', len(buf))
 
     def compressed(self, RCB_string):
-        RCB = ord(RCB_string)
+        if(type(RCB_string) == int):
+            RCB = RCB_string
+        else:
+            RCB = ord(RCB_string)
         if (RCB == 0x9A) or ((RCB & 0x0F) == 0x08) or ((RCB & 0x0F) == 0x09):
             return True
         else:
