@@ -33,6 +33,8 @@ nje = njelib.NJE(sys.argv[1],sys.argv[2])
 nje.set_debuglevel(1)
 t = nje.session(host=sys.argv[3],port=port, timeout=2,password=password)
 if t:
-    nje.dumbClient()
+    # nje.dumbClient()
+    Reply = nje.sendCommand("cpq n")
+    print(Reply, flush=True)
 else:
     print ("[!] Error, unable to connect!")

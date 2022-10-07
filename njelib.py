@@ -57,7 +57,7 @@ class NJE:
         self.connected  = False
         self.offline    = False
         self.server_sec = ''
-        self.FCS        = ''
+        self.FCS        = b''
         #self.OIP        = socket.inet_aton(host)
         self.R          = b"\x00"
         self.node       = 0
@@ -276,9 +276,9 @@ class NJE:
         if not self.connected:
             return False
 
-        self.msg("Sequence is: " + self.phex(chr(self.sequence)))
-        self.msg("Own Node   : " + self.phex(self.own_node))
-        self.msg("Dest Node  : " + self.phex(self.target_node))
+        # self.msg("Sequence is: " + self.phex(chr(self.sequence)))
+        # self.msg("Own Node   : " + self.phex(self.own_node))
+        # self.msg("Dest Node  : " + self.phex(self.target_node))
         self.signed_on = True
         return True
 
@@ -377,6 +377,15 @@ class NJE:
         DS  = b"\x10" + b"\x02" #DLE-STX
         BCB  = chr(self.sequence).encode('EBCDIC-CP-BE') 
         FCS  = self.FCS
+        if(type(DS) == str):
+            DS = DS.encode('EBCDIC-CP-BE')
+        if(type(BCB) == str):
+            BCB = BCB.encode('EBCDIC-CP-BE')
+        if(type(FCS) == str):
+            FCS = FCS.encode('EBCDIC-CP-BE')
+        if(type(nje_record) == str):
+            nje_record = nje_record.encode('EBCDIC-CP-BE')
+
         TTR = self.calcTTR(DS + BCB + FCS + nje_record)
         records = TTR + DS + BCB + FCS + nje_record
         self.sendData(self.makeTTB(records))
@@ -634,7 +643,20 @@ class NJE:
             self.msg("RCB: %r", record['RCB'])
             self.msg("SRCB: %r", record['SRCB'])
             #self.msg("Record: %r", self.phex(record['Data']))
-            total_len = len(record['RCB']) + len(record['SRCB']) + len(record['Data'])
+            total_len = 0
+            if(type(record['RCB']) == int):
+                total_len += 1
+            else:
+                total_len += len(record["RCB"])
+            if(type(record['SRCB']) == int):
+                total_len += 1
+            else:
+                total_len += len(record["SRCB"])
+            if(type(record['Data']) == int):
+                total_len += 1
+            else:
+                total_len += len(record["Data"])
+            # total_len = len(record['RCB']) + len(record['SRCB']) + len(record['Data'])
 
             if total_len == 255:
                 self.msg("Record Exceeds Total Size. Truncated Record.")
@@ -648,8 +670,11 @@ class NJE:
                 cur_data = prev_data + record['Data'][4:] #Skip the sequence packets
                 record['Data'] = cur_data
                 prev_rcb = ''
+            if type(record['RCB']) == int:
+                RCB = record['RCB']
+            else:
+                RCB = ord(record['RCB'])
 
-            RCB = ord(record['RCB'])
 
             if record['RCB'] == b"\x00" and record['SRCB'] == b'\x00' and record['Data'] == b"\x00":
                 self.sendHeartbeat()
@@ -710,12 +735,12 @@ class NJE:
             B - Signoff
             """
 
-        SRCB = self.EbcdicToAscii(record['SRCB'])
+        SRCB = self.EbcdicToAscii(bytes(record['SRCB']))
         if SRCB == "I":
             self.msg("[NCCR] I - Initial Signon")
         elif SRCB == "J":
             self.msg("[NCCR] J - Response signon")
-            record['NCCIDL'] =  record['Data'][0]
+            record['NCCIDL'] =  bytes(record['Data'][0])
             record['NCCINODE'] = self.EbcdicToAscii(record['Data'][1:9])
             record['NCCIQUAL'] = record['Data'][9]
             self.msg("NCCIQUAL: %r", self.phex(record['NCCIQUAL']))
@@ -728,9 +753,9 @@ class NJE:
             #record['NCCIPENC'] = record['Data'][32:40]
             record['NCCIFLG'] = record['Data'][34]
             record['NCCIFEAT'] = record['Data'][45:]
-            self.target_node = record['NCCIQUAL']
+            self.target_node = bytes(record['NCCIQUAL'])
             record['Data'] = ''
-            if record['NCCIEVNT'] == "\x00\x00\x00\x00":
+            if record['NCCIEVNT'] == b"\x00\x00\x00\x00":
                 # Reset the connection with type K
                 self.send_reset() #Type 'K'
                 self.records = self.processData(self.getData())
@@ -755,10 +780,10 @@ class NJE:
 
     def send_reset(self):
         ''' Builds Reset Signon Record '''
-        RCB = "\xF0"     #NCCRCB type 0xF0
-        SRCB = "\xD2"     #SRCB = 'K'
-        LEN = "\x09"
-        reset = LEN + "\xFF\xFF\xFF\xFF" + "\x00\xC8" + "\x00\x00\x00\x00"
+        RCB = b"\xF0"     #NCCRCB type 0xF0
+        SRCB = b"\xD2"     #SRCB = 'K'
+        LEN = b"\x09"
+        reset = LEN + b"\xFF\xFF\xFF\xFF" + b"\x00\xC8" + b"\x00\x00\x00\x00"
         self.msg("Sending  >> Reset Signon Record type: K")
         self.sendNJE(RCB, SRCB, reset)
         #self.sendData(self.makeTTB(self.makeTTR_dbh(reset_signon)))
