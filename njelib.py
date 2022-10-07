@@ -62,7 +62,7 @@ class NJE:
         self.R          = b"\x00"
         self.node       = 0
         self.password   = password
-        self.own_node   = chr(0x01) # Node is default 1. Can be changed to anything
+        self.own_node   = chr(0x01).encode('EBCDIC-CP-BE')  # Node is default 1. Can be changed to anything
         self.sequence   = 0x80
         if host:
             self.signon(self.host, self.port)
@@ -375,7 +375,7 @@ class NJE:
             nje_record += data
 
         DS  = b"\x10" + b"\x02" #DLE-STX
-        BCB  = bytes([chr(self.sequence)])
+        BCB  = chr(self.sequence).encode('EBCDIC-CP-BE') 
         FCS  = self.FCS
         TTR = self.calcTTR(DS + BCB + FCS + nje_record)
         records = TTR + DS + BCB + FCS + nje_record
@@ -424,7 +424,7 @@ class NJE:
         nje_record += b"\x00"
 
         DS  = b"\x10" + b"\x02" #DLE-STX
-        BCB  = bytes([chr(self.sequence)])
+        BCB  = chr(self.sequence).encode('EBCDIC-CP-BE') 
         FCS  = self.FCS
         TTR = self.calcTTR(DS + BCB + FCS + nje_record)
         records = TTR + DS + BCB + FCS + nje_record
@@ -434,7 +434,7 @@ class NJE:
 
     def sendHeartbeat(self):
         self.msg("Sending Hearbeat Request Reply")
-        BCB  = bytes([chr(self.sequence)])
+        BCB  = chr(self.sequence).encode('EBCDIC-CP-BE') 
         self.sendData(b"\x00\x00\x00\x16\x00\x00\x00\x00\x00\x00\x00\x06\x10\x02" +
                       BCB + self.FCS + b"00\x00\x00\x00\x00")
         self.INC_SEQUENCE()
