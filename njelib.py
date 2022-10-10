@@ -34,7 +34,7 @@ import time
 from select import select
 import binascii
 from binascii import hexlify, unhexlify
-from bitstring import BitStream, BitArray
+# from bitstring import BitStream, BitArray
 
 DEBUGLEVEL = 0
 NJE_PORT = 175
@@ -56,13 +56,13 @@ class NJE:
         self.RIP        = socket.inet_aton(rip)
         self.connected  = False
         self.offline    = False
-        self.server_sec = ''
+        self.server_sec = b''
         self.FCS        = b''
         #self.OIP        = socket.inet_aton(host)
         self.R          = b"\x00"
         self.node       = 0
         self.password   = password
-        self.own_node   = chr(0x01).encode('EBCDIC-CP-BE')  # Node is default 1. Can be changed to anything
+        self.own_node   = b'\x01' # Node is default 1. Can be changed to anything
         self.sequence   = 0x80
         if host:
             self.signon(self.host, self.port)
@@ -113,10 +113,10 @@ class NJE:
 
     def signoff(self):
         #Sends a B Record
-        adios = ('\x00\x00\x00\x19\x00\x00\x00\x00\x00\x00\x00\x09\x10\x02' +
-                   chr(self.sequence) +
-                   '\x8F\xCF\xF0\xC2\x00\x00\x00\x00\x00\x00' )
-        self.msg("Sending Signoff Record: %r", self.EbcdicToAscii(adios[18]))
+        adios = (b'\x00\x00\x00\x19\x00\x00\x00\x00\x00\x00\x00\x09\x10\x02' +
+                   bytes([self.sequence]) +
+                   b'\x8F\xCF\xF0\xC2\x00\x00\x00\x00\x00\x00' )
+        self.msg("Sending Signoff Record: %r", self.EbcdicToAscii(adios[18:19]))
         self.sendData(adios)
         self.disconnect()
 
@@ -141,14 +141,14 @@ class NJE:
 
         if self.debuglevel > 0:
             if self.offline:
-                print ('NJE: [%s]' % (caller,))
+                print('NJE: [%s]' % caller, end=' ')
             else:
-                print ('NJE(%s,%s): [%s]' % (self.host, self.port, caller),)
+                print('NJE(%s,%s): [%s]' % (self.host, self.port, caller), end=' ')
 
             if args:
-                print (msg % args)
+                print(msg % args)
             else:
-                print (msg)
+                print(msg)
 
     def set_debuglevel(self, debuglevel):
         """Set the debug level.
@@ -170,17 +170,15 @@ class NJE:
 
     def AsciiToEbcdic(self, s):
         ''' Converts Ascii to EBCDIC '''
-        constructed = s
         if(type(s) == bytes):
-            constructed = constructed.decode("utf-8")
-        return constructed.encode('EBCDIC-CP-BE')
+            s = s.decode("utf-8")
+        return s.encode('EBCDIC-CP-BE')
 
     def EbcdicToAscii(self, s):
         ''' Converts EBCDIC to UTF-8 '''
-        constructed = s
         if(type(s) == bytes):
-            constructed = constructed.decode("EBCDIC-CP-BE")
-        return constructed.encode('utf-8')
+            s = s.decode("EBCDIC-CP-BE")
+        return s.encode('utf-8')
 
     def initiate(self):
         """ Implement NJE initialization procedure
@@ -237,18 +235,19 @@ class NJE:
         bR     = struct.unpack("b", buff[32:33])[0]
 
 
-        self.msg("Response << TYPE: " + bTYPE.decode("utf-8") + " RHOST: " + bRHOST.decode("utf-8") + " OHOST: " + bRHOST.decode("utf-8") + " R: " + str(bR))
+        self.msg("Response << TYPE: " + str(bTYPE) + " RHOST: " + str(bRHOST) + " OHOST: " + str(bRHOST) + " R: " + str(bR))
 
         if bR == 4:
-            print ("[!] Incorrect RHOST (", self.EbcdicToAscii(self.RHOST).strip(),  ") for OHOST: ", self.EbcdicToAscii(self.OHOST).strip(), "\n[!] Or RHOST already connected to OHOST")
+            print("[!] Incorrect RHOST (" + self.EbcdicToAscii(self.RHOST).strip() + ") for OHOST: " + self.EbcdicToAscii(self.OHOST).strip() + \
+                  "\n[!] Or RHOST already connected to OHOST")
             self.disconnect()
             return False
         elif bR == 1:
-            print ("[!] Incorrect RHOST (", self.EbcdicToAscii(self.RHOST).strip(), ") and/or OHOST (", self.EbcdicToAscii(self.OHOST).strip(), ")")
+            print("[!] Incorrect RHOST (" + self.EbcdicToAscii(self.RHOST).strip() + ") and/or OHOST (" + self.EbcdicToAscii(self.OHOST).strip() + ")")
             self.disconnect()
             return False
         elif bR != 0:
-            print ("[!] Trying to Connect to Active Connection")
+            print("[!] Trying to Connect to Active Connection")
             self.disconnect()
             return False
         self.connected = True
@@ -256,7 +255,7 @@ class NJE:
         buff = self.processData(self.getData())
 
         if buff[0]['Data'] != b'\x10\x70':
-            print ("[!] Sent SOH ENQ but did not recieve DLE ACK0")
+            print("[!] Sent SOH ENQ but did not recieve DLE ACK0")
             self.disconnect()
             return False
 
@@ -313,7 +312,7 @@ class NJE:
             self.msg("Creating NMR Command")
             NMRFLAG  = b"\x90" #NMRFLAGC Set to 'on'. From IBM "If on, the NMR contains a command"
             NMRTO    = self.OHOST + self.target_node # This is TO node name and number
-            NMROUT   = chr(0)*8 # was 00:00:00:00:01:00:00:01 but no idea if it needs to be
+            NMROUT   = bytes([0])*8 # was 00:00:00:00:01:00:00:01 but no idea if it needs to be
             NMRFM    = self.RHOST + self.own_node
             NMRLEVEL = b"\x77" # The level, we put it as essential
             NMRTYPE  = b"\x00" # 00 for unformatted commands.
@@ -336,7 +335,7 @@ class NJE:
 
 
         NMRMSG  = self.AsciiToEbcdic(message)
-        NMRML   = chr(len(NMRMSG))
+        NMRML   = bytes([len(NMRMSG)])
         NMR_packet =( NMRFLAG + NMRLEVEL + NMRTYPE  + NMRML + NMRTO +
                       NMROUT + NMRFM + NMRMSG   )
 
@@ -375,17 +374,8 @@ class NJE:
             nje_record += data
 
         DS  = b"\x10" + b"\x02" #DLE-STX
-        BCB  = chr(self.sequence).encode('EBCDIC-CP-BE') 
+        BCB  = bytes([self.sequence])
         FCS  = self.FCS
-        if(type(DS) == str):
-            DS = DS.encode('EBCDIC-CP-BE')
-        if(type(BCB) == str):
-            BCB = BCB.encode('EBCDIC-CP-BE')
-        if(type(FCS) == str):
-            FCS = FCS.encode('EBCDIC-CP-BE')
-        if(type(nje_record) == str):
-            nje_record = nje_record.encode('EBCDIC-CP-BE')
-
         TTR = self.calcTTR(DS + BCB + FCS + nje_record)
         records = TTR + DS + BCB + FCS + nje_record
         self.sendData(self.makeTTB(records))
@@ -410,7 +400,7 @@ class NJE:
                   record is created with RCB + SRCB
         """
 
-        nje_record = b''
+        nje_record = ''
 
         for record in records:
             self.msg("Creating NJE Record with RCB of %r and SRCB of %r", record['RCB'], record['SRCB'])
@@ -430,10 +420,10 @@ class NJE:
                 nje_record += data
 
         #adding an EOR record:
-        nje_record += b"\x00"
+        nje_record += "\x00"
 
-        DS  = b"\x10" + b"\x02" #DLE-STX
-        BCB  = chr(self.sequence).encode('EBCDIC-CP-BE') 
+        DS  = "\x10" + "\x02" #DLE-STX
+        BCB  = chr(self.sequence)
         FCS  = self.FCS
         TTR = self.calcTTR(DS + BCB + FCS + nje_record)
         records = TTR + DS + BCB + FCS + nje_record
@@ -443,14 +433,14 @@ class NJE:
 
     def sendHeartbeat(self):
         self.msg("Sending Hearbeat Request Reply")
-        BCB  = chr(self.sequence).encode('EBCDIC-CP-BE') 
+        BCB  = bytes([self.sequence])
         self.sendData(b"\x00\x00\x00\x16\x00\x00\x00\x00\x00\x00\x00\x06\x10\x02" +
                       BCB + self.FCS + b"00\x00\x00\x00\x00")
         self.INC_SEQUENCE()
 
     def check_signoff(self, buf):
         if self.EbcdicToAscii(buf[18]) == 'B':
-            print ("[+] Recieved Signoff Record of type 'B'. Closing Connection.")
+            print("[+] Recieved Signoff Record of type 'B'. Closing Connection.")
 
             return False
         else:
@@ -532,10 +522,10 @@ class NJE:
                 buf = self.sock.recv(256)
                 data += buf
 
-                while( buf):
+                while( buf != b''):
                     buf = self.sock.recv(256)
                     data += buf
-                if(buf == ''):
+                if(buf == b''):
                     break
             except socket.error:
                 pass
@@ -583,8 +573,8 @@ class NJE:
                     current_record = current_record[5:]
                     while len(current_record) > 1:
                         packet_dict = {
-                            'RCB' : current_record[0],
-                            'SRCB' : current_record[1]
+                            'RCB' : current_record[0:1],
+                            'SRCB' : current_record[1:2]
                             }
                         current_record = current_record[2:]
                         if self.compressed(packet_dict['RCB']):
@@ -595,7 +585,7 @@ class NJE:
                             packet_dict['Data'] = current_record
                             current_record = current_record[record_length:]
                         self.msg("Adding Record with RCB %r and SRCB %r", packet_dict['RCB'], packet_dict['SRCB'])
-                        self.msg("Decompressed Record: %s", self.phex(packet_dict['Data']))
+                        # self.msg("Decompressed Record: %s", self.phex(packet_dict['Data']))
                         received_data.append(packet_dict)
                 else:
                     packet_dict = { 'Data' :current_record}
@@ -610,7 +600,7 @@ class NJE:
 
     def phex(self, stuff):
         hexed = binascii.hexlify(bytearray(stuff))
-        return ' '.join(hexed[i:i+2].decode("utf-8") for i in range(0, len(hexed), 2))
+        return b' '.join(hexed[i:i+2] for i in range(0, len(hexed), 2))
 
     def process_RCB(self):
         # Record Control Byte                  (Pg 124)
@@ -629,7 +619,7 @@ class NJE:
             9A    Operator command/console message
 
         """
-        prev_rcb = prev_srcb = prev_data = ''
+        prev_rcb = prev_srcb = prev_data = b''
 
         self.msg("Processing %i NJE Records", len(self.records))
         # for record in self.records:
@@ -639,24 +629,10 @@ class NJE:
         #     self.msg("Record Len: %i", len(record['Data']))
 
         for record in self.records:
-
             self.msg("RCB: %r", record['RCB'])
             self.msg("SRCB: %r", record['SRCB'])
             #self.msg("Record: %r", self.phex(record['Data']))
-            total_len = 0
-            if(type(record['RCB']) == int):
-                total_len += 1
-            else:
-                total_len += len(record["RCB"])
-            if(type(record['SRCB']) == int):
-                total_len += 1
-            else:
-                total_len += len(record["SRCB"])
-            if(type(record['Data']) == int):
-                total_len += 1
-            else:
-                total_len += len(record["Data"])
-            # total_len = len(record['RCB']) + len(record['SRCB']) + len(record['Data'])
+            total_len = len(record['RCB']) + len(record['SRCB']) + len(record['Data'])
 
             if total_len == 255:
                 self.msg("Record Exceeds Total Size. Truncated Record.")
@@ -670,11 +646,8 @@ class NJE:
                 cur_data = prev_data + record['Data'][4:] #Skip the sequence packets
                 record['Data'] = cur_data
                 prev_rcb = ''
-            if type(record['RCB']) == int:
-                RCB = record['RCB']
-            else:
-                RCB = ord(record['RCB'])
 
+            RCB = ord(record['RCB'])
 
             if record['RCB'] == b"\x00" and record['SRCB'] == b'\x00' and record['Data'] == b"\x00":
                 self.sendHeartbeat()
@@ -734,15 +707,14 @@ class NJE:
             N - Subtract connection
             B - Signoff
             """
-
-        SRCB = record['SRCB']
-        if SRCB == 201:
+        SRCB = self.EbcdicToAscii(record['SRCB'])
+        if SRCB == b"I":
             self.msg("[NCCR] I - Initial Signon")
-        elif SRCB == 209:
+        elif SRCB == b"J":
             self.msg("[NCCR] J - Response signon")
-            record['NCCIDL'] =  bytes(record['Data'][0])
+            record['NCCIDL'] =  record['Data'][0:1]
             record['NCCINODE'] = self.EbcdicToAscii(record['Data'][1:9])
-            record['NCCIQUAL'] = record['Data'][9]
+            record['NCCIQUAL'] = record['Data'][9:10]
             self.msg("NCCIQUAL: %r", self.phex(record['NCCIQUAL']))
             record['NCCIEVNT'] = record['Data'][10:14]
             record['NCCIREST'] = record['Data'][14:16]
@@ -751,10 +723,10 @@ class NJE:
             record['NCCINPAS'] = self.EbcdicToAscii(record['Data'][26:34])
             #record['NCCIPRAW'] = record['Data'][28:32]
             #record['NCCIPENC'] = record['Data'][32:40]
-            record['NCCIFLG'] = record['Data'][34]
+            record['NCCIFLG'] = record['Data'][34:35]
             record['NCCIFEAT'] = record['Data'][45:]
-            self.target_node = bytes(record['NCCIQUAL'])
-            record['Data'] = ''
+            self.target_node = record['NCCIQUAL']
+            record['Data'] = b''
             if record['NCCIEVNT'] == b"\x00\x00\x00\x00":
                 # Reset the connection with type K
                 self.send_reset() #Type 'K'
@@ -765,15 +737,15 @@ class NJE:
                 self.send_concurrence(record['NCCIEVNT']) #Type 'L'
             return
 
-        elif SRCB == "K":
+        elif SRCB == b"K":
             self.msg("[NCCR] K - Reset signon")
-        elif SRCB == "L":
+        elif SRCB == b"L":
             self.msg("[NCCR] L - Concurrence signon")
-        elif SRCB == "M":
+        elif SRCB == b"M":
             self.msg("[NCCR] M - Add connection")
-        elif SRCB == "N":
+        elif SRCB == b"N":
             self.msg("[NCCR] N - Subtract connection")
-        elif SRCB == "B":
+        elif SRCB == b"B":
             self.msg("[NCCR] B - Signoff")
             self.msg("Recieved Signoff Record of type 'B'. Closing Connection")
             self.disconnect()
@@ -790,19 +762,19 @@ class NJE:
 
     def send_concurrence(self, NCCIEVNT):
         ''' Builds concurrence Signon Record '''
-        RCB = "\xF0"     #NCCRCB type 0xF0
-        SRCB = "\xD3"     #SRCB = 'L'
-        LEN = "\x09"
-        con = LEN + NCCIEVNT + "\x00\xC8"
+        RCB = b"\xF0"     #NCCRCB type 0xF0
+        SRCB = b"\xD3"     #SRCB = 'L'
+        LEN = b"\x09"
+        con = LEN + NCCIEVNT + b"\x00\xC8"
         self.msg("Sending  >> Accept (concurrence) network SIGNON Record type: L")
         self.sendNJE(RCB, SRCB, con)
         #self.sendData(self.makeTTB(self.makeTTR_dbh(concurrent_signon)))
 
     def request_stream(self):
         """ Requests to initiate an NJE stream """
-        RCB = "\x90"
-        SRCB = "\x98"
-        DATA = "\x00\x00"
+        RCB = b"\x90"
+        SRCB = b"\x98"
+        DATA = b"\x00\x00"
         self.msg("Requesting NJE Stream")
         self.sendNJE(RCB, SRCB, DATA)
 
@@ -1191,7 +1163,7 @@ class NJE:
         record = {}
         # From http://www-01.ibm.com/support/knowledgecenter/SSB27U_5.4.0/com.ibm.zvm.v54.dmta7/hnmr.htm
         #NMRFLAG
-        record['NMRFLAG'] = ord(d[0])
+        record['NMRFLAG'] = d[0]
         #NMRFLAGC EQU   B'10000000'         NMRMSG contains a command
         #NMRFLAGW EQU   B'01000000'         NMROUT has JES2 RMT number
         #NMRFLAGT EQU   B'00100000'         NMROUT has user ID
@@ -1209,26 +1181,26 @@ class NJE:
             'NMRFLAGJ' : self.get_bit(record['NMRFLAG'],2),
             'NMRFLAGD' : self.get_bit(record['NMRFLAG'],1),
             'NMRFLAGS' : self.get_bit(record['NMRFLAG'],0),
-            'NMRLEVEL' : ord(d[1]) & 0xF0,
-            'NMRPRIO'  : ord(d[1]) & 0x0F,
-            'NMRTYPE'  : ord(d[2]),
+            'NMRLEVEL' : d[1] & 0xF0,
+            'NMRPRIO'  : d[1] & 0x0F,
+            'NMRTYPE'  : d[2],
                 #NMRTYPE
                 #NMRTYPEX EQU   B'11110000'         Reserved bits
                 #NMRTYPED EQU   B'00000001'         DOM (not supported)
                 #NMRTYPEF EQU   B'00000010'         Formatted command in NMRMSG
                 #NMRTYPET EQU   B'00000100'         Msg text only in NMRMSG
                 #NMRTYPE4 EQU   B'00001000'         Msg text contains control info
-            'NMRTYPEX' : ord(d[2]) & 0xF0,
-            'NMRTYPED' : self.get_bit(ord(d[2]), 0),
-            'NMRTYPEF' : self.get_bit(ord(d[2]), 1),
-            'NMRTYPET' : self.get_bit(ord(d[2]), 2),
-            'NMRTYPE4' : self.get_bit(ord(d[2]), 3),
-            'NMRML'    : ord(d[3]),  #Length of the message
+            'NMRTYPEX' : d[2] & 0xF0,
+            'NMRTYPED' : self.get_bit(d[2], 0),
+            'NMRTYPEF' : self.get_bit(d[2], 1),
+            'NMRTYPET' : self.get_bit(d[2], 2),
+            'NMRTYPE4' : self.get_bit(d[2], 3),
+            'NMRML'    : d[3],  #Length of the message
             'NMRTONOD' : self.EbcdicToAscii(d[4:12]),
-            'NMRFMQUL' : d[12],
+            'NMRFMQUL' : d[12:13],
             'NMROUT'   : d[13:21],
             'NMRFMNOD' : self.EbcdicToAscii(d[21:29]),
-            'NMRTOQUL' : d[29]
+            'NMRTOQUL' : d[29:30]
         } )
 
 
@@ -1427,57 +1399,54 @@ class NJE:
         self.msg("Raw Message before compression: %s", self.phex(buf))
 
         #self.msg("Recieved: %r", self.phex(buf))
-        if len(buf) == '': return ''
+        if len(buf) == b'': return b''
         processed_bytes = 0
         c = 0
-        d = '' # The compressed data < 252 bytes
-        t = '' # Temp data while we count
+        d = b'' # The compressed data < 252 bytes
+        t = b'' # Temp data while we count
         while len(buf) > 0 and processed_bytes < 253:
-            if ord(buf[0]) == 0x40 and ord(buf[1]) == 0x40:
-                if c > 0: d += chr(0xC0 + c) + t # If we go straight from repeat char to repeat spaces this creates an extra char
-                t = ''
+            if buf[0] == 0x40 and buf[1] == 0x40:
+                if c > 0: d += bytes([0xC0 + c]) + t # If we go straight from repeat char to repeat spaces this creates an extra char
+                t = b''
                 c = 1
-                while c < len(buf) and (ord(buf[c]) == 0x40 and (processed_bytes + c < 253)):
+                while c < len(buf) and (buf[c] == 0x40 and (processed_bytes + c < 253)):
                     if c == 31: break
                     c += 1
-                d += chr(0x80 + c)
+                d += bytes([0x80 + c])
                 #self.msg("Repeated %r %i times", buf[0], c)
                 buf = buf[c-1:]
                 processed_bytes += c
                 c = 0
-            elif len(buf) > 2 and ord(buf[0]) == ord(buf[2]) and ord(buf[0]) == ord(buf[1]):
-                if c > 0: d += chr(0xC0 + c) + t # Same as above. This if fixes that
-                t = ''
+            elif len(buf) > 2 and buf[0] == buf[2] and buf[0] == buf[1]:
+                if c > 0: d += bytes([0xC0 + c]) + t # Same as above. This if fixes that
+                t = b''
                 c = 2
-                while c < len(buf) and ( ord(buf[c]) == ord(buf[0]) and (processed_bytes + c < 253) ):
+                while c < len(buf) and ( buf[c] == buf[0] and (processed_bytes + c < 253) ):
                     if c == 31: break
                     c += 1
-                d += chr(0xA0 + c) + buf[0]
+                d += bytes([0xA0 + c]) + buf[0:1]
                 buf = buf[c-1:]
                 processed_bytes += c
                 c = 0
             elif c == 63:
-                d += chr(0xC0 + c) + t
-                t = ''
+                d += bytes([0xC0 + c]) + t
+                t = b''
                 processed_bytes += c
                 c = 0
             else:
-                t += buf[0]
+                t += buf[0:1]
                 c += 1
                 processed_bytes += 1
 
             buf = buf[1:]
-        if c > 0: d += chr(0xC0 + c) + t
+        if c > 0: d += bytes([0xC0 + c]) + t
         self.msg("Total bytes: %i compressed to %i", processed_bytes, len(d))
         #self.msg("Remaining bytes: %i", len(buf))
         self.msg("Compressed: %s", self.phex(d))
         return (d+b'\x00', len(buf))
 
     def compressed(self, RCB_string):
-        if(type(RCB_string) == int):
-            RCB = RCB_string
-        else:
-            RCB = ord(RCB_string)
+        RCB = ord(RCB_string)
         if (RCB == 0x9A) or ((RCB & 0x0F) == 0x08) or ((RCB & 0x0F) == 0x09):
             return True
         else:
@@ -1490,7 +1459,7 @@ class NJE:
             the ammount of bytes processed. 0x00 represents the end of an
             NJE record """
 
-        buf = ''
+        buf = b''
         skip = 0
         b = 0
         repeat = False
@@ -1498,14 +1467,14 @@ class NJE:
             b += 1
             if skip > 0:
                 skip -= 1
-                buf += i
+                buf += bytes([i])
                 continue
             if repeat:
                 #self.msg("Char %r repeats %r times", self.phex(i), count)
-                buf += i * count
+                buf += bytes([i]) * count
                 repeat = False
                 continue
-            SCB = ord(i)
+            SCB = i
             SCB_type = SCB & 0xC0
             #self.msg("Current Char: %r, Count: %r, Type: %r", self.phex(i), (SCB & 0x3F), self.phex(chr(SCB_type)))
             if SCB_type == 0x00:
@@ -1554,17 +1523,17 @@ class NJE:
         self.sendNMR(command, True)
         self.records = self.processData(self.getData())
         self.process_RCB()
-        message = ''
+        message = b''
         for record in self.getNMR():
             for i in record:
                 self.msg("record[%s]: %r", i, record[i])
             if 'NMRMSG' in record:
-                message += record['NMRMSG'] + "\n"
+                message += record['NMRMSG'] + b"\n"
         self.signoff()
         if len(message) <= 0:
             return False
         else:
-            return message
+            return message.decode("utf-8")
 
     def sendJCL(self, filename, userid='ibmuser', group='sys1'):
         """ sends JCL file as user """
@@ -1684,18 +1653,13 @@ def test():
         password = sys.argv[5]
 
     nje = NJE(ohost,rhost)
-    nje.set_debuglevel(1)
-    t = nje.session(host=host, port=port, timeout=2, password=password)
+    nje.set_debuglevel(debuglevel)
+    t = nje.signon(host=host,port=port, timeout=2, password=password)
 
     if t:
-        nje.dumbClient()
+        print("[+] Connection Successful")
     else:
-        print ("[!] Error, unable to connect!")
-
-    if t:
-        print ("[+] Connection Successful")
-    else:
-        print ("[!] Connection Failed")
+        print("[!] Connection Failed")
 
 if __name__ == '__main__':
     test()
