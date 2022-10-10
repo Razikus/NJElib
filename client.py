@@ -67,6 +67,7 @@ t = nje.session(host=sys.argv[3],port=port, timeout=2,password=password)
 if t:
     # nje.dumbClient()
     locSendcmd()
+    nje.disconnect()
     # Reply = nje.sendCommand("cpq n")
     # print(Reply, flush=True)
 else:
